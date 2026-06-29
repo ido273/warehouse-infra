@@ -21,3 +21,9 @@ module "eks" {
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
 }
+
+module "argocd" {
+  source = "./modules/argocd"
+
+  depends_on = [module.eks]
+}
