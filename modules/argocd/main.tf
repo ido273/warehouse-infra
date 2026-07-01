@@ -4,6 +4,10 @@ terraform {
       source  = "gavinbunney/kubectl"
       version = "~> 1.14"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.0"
+    }
   }
 }
 
@@ -41,4 +45,30 @@ resource "kubectl_manifest" "root_app" {
   YAML
 
   depends_on = [helm_release.argocd]
+}
+
+data "aws_secretsmanager_secret_version" "mysql" {
+  secret_id = "warehouse/mysql"
+}
+
+resource "kubernetes_namespace" "warehouse" {
+  metadata {
+    name = "warehouse"
+  }
+  depends_on = [helm_release.argocd]
+}
+
+resource "kubernetes_secret" "mysql" {
+  metadata {
+    name      = "mysql-secret"
+    namespace = kubernetes_namespace.warehouse.metadata[0].name
+  }
+
+  data = {
+    "root-password" = jsondecode(data.aws_secretsmanager_secret_version.mysql.secret_string)["root_password"]
+    "password"      = jsondecode(data.aws_secretsmanager_secret_version.mysql.secret_string)["password"]
+  }
+
+  type       = "Opaque"
+  depends_on = [kubernetes_namespace.warehouse]
 }
