@@ -62,3 +62,36 @@ module "ebs_csi_irsa" {
     }
   }
 }
+module "backend_s3_irsa" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name = "${var.cluster_name}-backend-s3"
+
+  role_policy_arns = {
+    s3 = aws_iam_policy.backend_s3.arn
+  }
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["warehouse:backend"]
+    }
+  }
+}
+
+resource "aws_iam_policy" "backend_s3" {
+  name = "${var.cluster_name}-backend-s3"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ]
+      Resource = "arn:aws:s3:::warehouse-images-ido273/*"
+    }]
+  })
+}
