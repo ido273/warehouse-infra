@@ -28,3 +28,12 @@ resource "aws_s3_bucket_policy" "warehouse_images" {
     }]
   })
 }
+resource "aws_s3_bucket" "warehouse_images" {
+  bucket        = "warehouse-images-ido273"
+  force_destroy = true
+
+  tags = {
+    Environment = var.environment
+    Terraform   = "true"
+  }
+}
