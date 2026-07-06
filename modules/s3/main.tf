@@ -11,9 +11,12 @@ resource "aws_s3_bucket" "warehouse_images" {
 resource "aws_s3_bucket_public_access_block" "warehouse_images" {
   bucket = aws_s3_bucket.warehouse_images.id
 
-  block_public_acls       = false
+  # Block ACL-based public access entirely. Public read is granted only through
+  # the explicit, least-privilege bucket policy below (GetObject on objects),
+  # so restrict_public_buckets stays false to let that policy take effect.
+  block_public_acls       = true
   block_public_policy     = false
-  ignore_public_acls      = false
+  ignore_public_acls      = true
   restrict_public_buckets = false
 }
 
@@ -28,4 +31,6 @@ resource "aws_s3_bucket_policy" "warehouse_images" {
       Resource  = "${aws_s3_bucket.warehouse_images.arn}/*"
     }]
   })
+
+  depends_on = [aws_s3_bucket_public_access_block.warehouse_images]
 }

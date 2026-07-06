@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -72,11 +76,64 @@ resource "kubernetes_secret" "mysql" {
   type       = "Opaque"
   depends_on = [kubernetes_namespace.warehouse]
 }
+
+# Application secrets generated at provision time — never committed to git.
+resource "random_password" "jwt" {
+  length  = 48
+  special = false
+}
+
+resource "random_password" "flask" {
+  length  = 48
+  special = false
+}
+
+resource "kubernetes_secret" "app" {
+  metadata {
+    name      = "app-secrets"
+    namespace = kubernetes_namespace.warehouse.metadata[0].name
+  }
+
+  data = {
+    "jwt-secret"   = random_password.jwt.result
+    "flask-secret" = random_password.flask.result
+    "database-url" = "mysql+pymysql://warehouse_user:${jsondecode(data.aws_secretsmanager_secret_version.mysql.secret_string)["password"]}@mysql/warehouse_db"
+  }
+
+  type       = "Opaque"
+  depends_on = [kubernetes_namespace.warehouse]
+}
+
+# k8s Secret consumed by the frontend chart's SECRET_KEY (see frontend values).
+resource "kubernetes_secret" "frontend" {
+  metadata {
+    name      = "frontend-secret"
+    namespace = kubernetes_namespace.warehouse.metadata[0].name
+  }
+
+  data = {
+    "secret-key" = random_password.flask.result
+  }
+
+  type       = "Opaque"
+  depends_on = [kubernetes_namespace.warehouse]
+}
 resource "helm_release" "nginx_ingress" {
   name             = "nginx-ingress"
   repository       = "https://kubernetes.github.io/ingress-nginx"
   chart            = "ingress-nginx"
   namespace        = "ingress-nginx"
   create_namespace = true
+  depends_on       = [helm_release.argocd]
+}
+
+# metrics-server: required for HPA CPU/memory targets and `kubectl top`.
+# EKS does not bundle it, so the HPAs read <unknown> without this.
+resource "helm_release" "metrics_server" {
+  name             = "metrics-server"
+  repository       = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart            = "metrics-server"
+  namespace        = "kube-system"
+  create_namespace = false
   depends_on       = [helm_release.argocd]
 }
