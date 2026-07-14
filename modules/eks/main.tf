@@ -124,7 +124,7 @@ resource "aws_iam_policy" "ai_tagging_bedrock" {
       Action = [
         "bedrock:InvokeModel"
       ]
-      Resource = "arn:aws:bedrock:eu-west-1::foundation-model/anthropic.claude-haiku-4-5*"
+      Resource = "arn:aws:bedrock:*::foundation-model/amazon.nova-lite-v1:0"
     }]
   })
 }
