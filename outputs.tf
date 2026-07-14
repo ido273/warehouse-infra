@@ -26,3 +26,8 @@ output "name_servers" {
 output "certificate_arn" {
   value = module.dns.certificate_arn
 }
+
+output "ai_tagging_bedrock_role_arn" {
+  description = "IRSA role ARN for the ai-tagging service account"
+  value       = module.eks.ai_tagging_bedrock_role_arn
+}

@@ -12,3 +12,8 @@ output "cluster_certificate_authority_data" {
   description = "EKS cluster certificate"
   value       = module.eks.cluster_certificate_authority_data
 }
+
+output "ai_tagging_bedrock_role_arn" {
+  description = "IRSA role ARN for the ai-tagging service account"
+  value       = module.ai_tagging_bedrock_irsa.iam_role_arn
+}
