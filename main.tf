@@ -21,13 +21,27 @@ module "eks" {
   private_subnet_ids = module.vpc.private_subnet_ids
 }
 
-module "argocd" {
-  source = "./modules/argocd"
-
-  depends_on = [module.eks]
-}
-
 module "s3" {
   source      = "./modules/s3"
   environment = var.environment
+}
+data "kubernetes_service" "nginx_ingress" {
+  metadata {
+    name      = "nginx-ingress-ingress-nginx-controller"
+    namespace = "ingress-nginx"
+  }
+  depends_on = [module.argocd]
+}
+
+module "dns" {
+  source       = "./modules/dns"
+  environment  = var.environment
+  domain_name  = var.domain_name
+  nlb_hostname = data.kubernetes_service.nginx_ingress.status[0].load_balancer[0].ingress[0].hostname
+}
+
+module "argocd" {
+  source          = "./modules/argocd"
+  certificate_arn = module.dns.certificate_arn
+  depends_on      = [module.eks]
 }

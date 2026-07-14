@@ -118,17 +118,7 @@ resource "kubernetes_secret" "frontend" {
   type       = "Opaque"
   depends_on = [kubernetes_namespace.warehouse]
 }
-resource "helm_release" "nginx_ingress" {
-  name             = "nginx-ingress"
-  repository       = "https://kubernetes.github.io/ingress-nginx"
-  chart            = "ingress-nginx"
-  namespace        = "ingress-nginx"
-  create_namespace = true
-  depends_on       = [helm_release.argocd]
-}
 
-# metrics-server: required for HPA CPU/memory targets and `kubectl top`.
-# EKS does not bundle it, so the HPAs read <unknown> without this.
 resource "helm_release" "metrics_server" {
   name             = "metrics-server"
   repository       = "https://kubernetes-sigs.github.io/metrics-server/"
@@ -136,4 +126,36 @@ resource "helm_release" "metrics_server" {
   namespace        = "kube-system"
   create_namespace = false
   depends_on       = [helm_release.argocd]
+}
+resource "helm_release" "nginx_ingress" {
+  name             = "nginx-ingress"
+  repository       = "https://kubernetes.github.io/ingress-nginx"
+  chart            = "ingress-nginx"
+  namespace        = "ingress-nginx"
+  create_namespace = true
+
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-cert"
+    value = var.certificate_arn
+  }
+
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-ports"
+    value = "https"
+  }
+
+  set {
+    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-backend-protocol"
+    value = "http"
+  }
+
+  # NLB terminates TLS and forwards plain HTTP for the "https" service port.
+  # Without this, that port still targets nginx's TLS listener (443, ssl on),
+  # which returns 400 on receiving cleartext HTTP.
+  set {
+    name  = "controller.service.targetPorts.https"
+    value = "http"
+  }
+
+  depends_on = [helm_release.argocd]
 }

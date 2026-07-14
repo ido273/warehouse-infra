@@ -17,3 +17,12 @@ output "cluster_endpoint" {
   description = "EKS cluster endpoint"
   value       = module.eks.cluster_endpoint
 }
+
+output "name_servers" {
+  description = "Add these nameservers to GoDaddy"
+  value       = module.dns.name_servers
+}
+
+output "certificate_arn" {
+  value = module.dns.certificate_arn
+}
