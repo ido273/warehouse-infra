@@ -1,13 +1,3 @@
-# Permanent infrastructure: Route53 hosted zone + ACM certificate.
-#
-# Lives in its own state (see backend.tf) specifically so it survives a
-# `terraform destroy` of the main stack (root main.tf / modules/eks etc).
-# Destroying and recreating a hosted zone changes its nameservers, which
-# would require re-delegating the domain at the registrar every time the
-# cluster is torn down and rebuilt — this layer exists to avoid that.
-#
-# modules/dns reads these back via data sources (aws_route53_zone,
-# aws_acm_certificate looked up by domain_name), it no longer creates them.
 
 resource "aws_route53_zone" "main" {
   name = var.domain_name
