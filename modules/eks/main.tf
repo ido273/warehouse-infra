@@ -92,7 +92,7 @@ resource "aws_iam_policy" "backend_s3" {
         "s3:GetObject",
         "s3:DeleteObject"
       ]
-      Resource = "arn:aws:s3:::warehouse-images-ido273/*"
+      Resource = "arn:aws:s3:::${var.s3_bucket_name}/*"
     }]
   })
 }

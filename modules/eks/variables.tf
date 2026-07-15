@@ -23,3 +23,8 @@ variable "cluster_endpoint_public_access_cidrs" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
+
+variable "s3_bucket_name" {
+  description = "Name of the S3 bucket the backend-s3 IRSA policy grants access to"
+  type        = string
+}

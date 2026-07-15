@@ -19,6 +19,7 @@ module "eks" {
   environment        = var.environment
   vpc_id             = module.vpc.vpc_id
   private_subnet_ids = module.vpc.private_subnet_ids
+  s3_bucket_name     = module.s3.bucket_name
 }
 
 module "s3" {
