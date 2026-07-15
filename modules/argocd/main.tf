@@ -149,13 +149,61 @@ resource "helm_release" "nginx_ingress" {
     value = "http"
   }
 
-  # NLB terminates TLS and forwards plain HTTP for the "https" service port.
-  # Without this, that port still targets nginx's TLS listener (443, ssl on),
-  # which returns 400 on receiving cleartext HTTP.
   set {
     name  = "controller.service.targetPorts.https"
     value = "http"
   }
+
+  depends_on = [helm_release.argocd]
+}
+
+data "aws_secretsmanager_secret_version" "grafana" {
+  secret_id = "warehouse/grafana"
+}
+
+resource "helm_release" "prometheus" {
+  name             = "prometheus"
+  repository       = "https://prometheus-community.github.io/helm-charts"
+  chart            = "kube-prometheus-stack"
+  namespace        = "monitoring"
+  create_namespace = true
+  version          = "~> 65.0"
+
+  values = [
+    yamlencode({
+      grafana = {
+        adminPassword = jsondecode(data.aws_secretsmanager_secret_version.grafana.secret_string)["admin_password"]
+        service = {
+          type = "ClusterIP"
+        }
+      }
+      prometheus = {
+        prometheusSpec = {
+          retention = "7d"
+        }
+      }
+    })
+  ]
+
+  depends_on = [helm_release.argocd]
+}
+
+resource "helm_release" "fluent_bit" {
+  name             = "fluent-bit"
+  repository       = "https://fluent.github.io/helm-charts"
+  chart            = "fluent-bit"
+  namespace        = "logging"
+  create_namespace = true
+
+  values = [
+    yamlencode({
+      cloudWatch = {
+        enabled      = true
+        region       = var.region
+        logGroupName = "/warehouse/${var.cluster_name}"
+      }
+    })
+  ]
 
   depends_on = [helm_release.argocd]
 }

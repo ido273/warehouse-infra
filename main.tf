@@ -41,8 +41,11 @@ module "dns" {
   nlb_hostname = data.kubernetes_service.nginx_ingress.status[0].load_balancer[0].ingress[0].hostname
 }
 
+
 module "argocd" {
   source          = "./modules/argocd"
   certificate_arn = module.dns.certificate_arn
+  region          = var.region
+  cluster_name    = var.cluster_name
   depends_on      = [module.eks]
 }
