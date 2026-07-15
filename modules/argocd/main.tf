@@ -51,10 +51,6 @@ resource "kubectl_manifest" "root_app" {
   depends_on = [helm_release.argocd]
 }
 
-data "aws_secretsmanager_secret_version" "mysql" {
-  secret_id = "warehouse/mysql"
-}
-
 resource "kubernetes_namespace" "warehouse" {
   metadata {
     name = "warehouse"
@@ -62,22 +58,15 @@ resource "kubernetes_namespace" "warehouse" {
   depends_on = [helm_release.argocd]
 }
 
-resource "kubernetes_secret" "mysql" {
-  metadata {
-    name      = "mysql-secret"
-    namespace = kubernetes_namespace.warehouse.metadata[0].name
-  }
-
-  data = {
-    "root-password" = jsondecode(data.aws_secretsmanager_secret_version.mysql.secret_string)["root_password"]
-    "password"      = jsondecode(data.aws_secretsmanager_secret_version.mysql.secret_string)["password"]
-  }
-
-  type       = "Opaque"
-  depends_on = [kubernetes_namespace.warehouse]
-}
-
-# Application secrets generated at provision time — never committed to git.
+# mysql-secret, app-secrets, and frontend-secret (k8s Secrets in the
+# "warehouse" namespace) are now managed by External Secrets Operator, synced
+# from AWS Secrets Manager — see warehouse-gitops/apps/secrets/*.yaml.
+#
+# jwt-secret/flask-secret are generated once here so they can be seeded into
+# the "warehouse/app-secrets" AWS Secrets Manager secret (which ESO reads from
+# — see the note on that ExternalSecret). Retrieve with:
+#   terraform output -raw jwt_secret
+#   terraform output -raw flask_secret
 resource "random_password" "jwt" {
   length  = 48
   special = false
@@ -88,35 +77,13 @@ resource "random_password" "flask" {
   special = false
 }
 
-resource "kubernetes_secret" "app" {
-  metadata {
-    name      = "app-secrets"
-    namespace = kubernetes_namespace.warehouse.metadata[0].name
-  }
-
-  data = {
-    "jwt-secret"   = random_password.jwt.result
-    "flask-secret" = random_password.flask.result
-    "database-url" = "mysql+pymysql://warehouse_user:${jsondecode(data.aws_secretsmanager_secret_version.mysql.secret_string)["password"]}@mysql/warehouse_db"
-  }
-
-  type       = "Opaque"
-  depends_on = [kubernetes_namespace.warehouse]
-}
-
-# k8s Secret consumed by the frontend chart's SECRET_KEY (see frontend values).
-resource "kubernetes_secret" "frontend" {
-  metadata {
-    name      = "frontend-secret"
-    namespace = kubernetes_namespace.warehouse.metadata[0].name
-  }
-
-  data = {
-    "secret-key" = random_password.flask.result
-  }
-
-  type       = "Opaque"
-  depends_on = [kubernetes_namespace.warehouse]
+resource "helm_release" "external_secrets" {
+  name             = "external-secrets"
+  repository       = "https://charts.external-secrets.io"
+  chart            = "external-secrets"
+  namespace        = "external-secrets"
+  create_namespace = true
+  depends_on       = [helm_release.argocd]
 }
 
 resource "helm_release" "metrics_server" {

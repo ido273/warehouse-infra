@@ -31,3 +31,20 @@ output "ai_tagging_bedrock_role_arn" {
   description = "IRSA role ARN for the ai-tagging service account"
   value       = module.eks.ai_tagging_bedrock_role_arn
 }
+
+output "external_secrets_role_arn" {
+  description = "IRSA role ARN for the External Secrets Operator service account"
+  value       = module.eks.external_secrets_role_arn
+}
+
+output "jwt_secret" {
+  description = "Generated JWT secret — seed into AWS Secrets Manager \"warehouse/app-secrets\" as \"jwt-secret\""
+  value       = module.argocd.jwt_secret
+  sensitive   = true
+}
+
+output "flask_secret" {
+  description = "Generated Flask secret — seed into AWS Secrets Manager \"warehouse/app-secrets\" as \"flask-secret\""
+  value       = module.argocd.flask_secret
+  sensitive   = true
+}

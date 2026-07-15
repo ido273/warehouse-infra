@@ -17,3 +17,8 @@ output "ai_tagging_bedrock_role_arn" {
   description = "IRSA role ARN for the ai-tagging service account"
   value       = module.ai_tagging_bedrock_irsa.iam_role_arn
 }
+
+output "external_secrets_role_arn" {
+  description = "IRSA role ARN for the External Secrets Operator service account"
+  value       = module.external_secrets_irsa.iam_role_arn
+}
