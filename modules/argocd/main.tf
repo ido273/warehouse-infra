@@ -8,10 +8,6 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.0"
     }
-    random = {
-      source  = "hashicorp/random"
-      version = "~> 3.0"
-    }
   }
 }
 
@@ -62,19 +58,28 @@ resource "kubernetes_namespace" "warehouse" {
 # "warehouse" namespace) are now managed by External Secrets Operator, synced
 # from AWS Secrets Manager — see warehouse-gitops/apps/secrets/*.yaml.
 #
-# jwt-secret/flask-secret are generated once here so they can be seeded into
-# the "warehouse/app-secrets" AWS Secrets Manager secret (which ESO reads from
-# — see the note on that ExternalSecret). Retrieve with:
-#   terraform output -raw jwt_secret
-#   terraform output -raw flask_secret
-resource "random_password" "jwt" {
-  length  = 48
-  special = false
-}
-
-resource "random_password" "flask" {
-  length  = 48
-  special = false
+# jwt-secret/flask-secret used to be generated here via random_password, but
+# that regenerates a new value on every apply — after a destroy+apply the
+# k8s Secret ESO creates would go out of sync with anything already relying
+# on the old value. They're now stored in AWS Secrets Manager
+# ("warehouse/app-secrets") like the mysql/grafana secrets, and must be
+# created there manually before the first apply:
+#
+#   aws secretsmanager create-secret \
+#     --name "warehouse/app-secrets" \
+#     --region eu-west-1 \
+#     --secret-string '{
+#       "jwt-secret": "CHOOSE_STRONG_SECRET_HERE",
+#       "flask-secret": "CHOOSE_STRONG_SECRET_HERE",
+#       "database-url": "mysql+pymysql://warehouse_user:warehouse_password@mysql/warehouse_db"
+#     }'
+#
+# The data source below isn't consumed by any resource (ESO reads the
+# secret directly, per warehouse-gitops/apps/secrets/app-external-secret.yaml)
+# — it exists so `terraform plan`/`apply` fails fast if the secret hasn't
+# been created yet, instead of that surfacing later as an ESO sync failure.
+data "aws_secretsmanager_secret_version" "app_secrets" {
+  secret_id = "warehouse/app-secrets"
 }
 
 resource "helm_release" "external_secrets" {
