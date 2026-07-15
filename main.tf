@@ -43,9 +43,10 @@ module "dns" {
 
 
 module "argocd" {
-  source          = "./modules/argocd"
-  certificate_arn = module.dns.certificate_arn
-  region          = var.region
-  cluster_name    = var.cluster_name
-  depends_on      = [module.eks]
+  source                    = "./modules/argocd"
+  certificate_arn           = module.dns.certificate_arn
+  region                    = var.region
+  cluster_name              = var.cluster_name
+  external_secrets_role_arn = module.eks.external_secrets_role_arn
+  depends_on                = [module.eks]
 }

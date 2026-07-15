@@ -13,3 +13,8 @@ variable "cluster_name" {
   description = "EKS cluster name"
   type        = string
 }
+
+variable "external_secrets_role_arn" {
+  description = "IRSA role ARN for the External Secrets Operator service account"
+  type        = string
+}

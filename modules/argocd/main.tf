@@ -83,7 +83,17 @@ resource "helm_release" "external_secrets" {
   chart            = "external-secrets"
   namespace        = "external-secrets"
   create_namespace = true
-  depends_on       = [helm_release.argocd]
+
+  # Annotate the chart's default ServiceAccount ("external-secrets" in the
+  # "external-secrets" namespace — matches the IRSA trust policy's
+  # namespace_service_accounts binding) so pods can assume the IRSA role
+  # without any manual step post-apply.
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = var.external_secrets_role_arn
+  }
+
+  depends_on = [helm_release.argocd]
 }
 
 resource "helm_release" "metrics_server" {
