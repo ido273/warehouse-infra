@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "~> 2.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -54,32 +58,23 @@ resource "kubernetes_namespace" "warehouse" {
   depends_on = [helm_release.argocd]
 }
 
-# mysql-secret, app-secrets, and frontend-secret (k8s Secrets in the
-# "warehouse" namespace) are now managed by External Secrets Operator, synced
-# from AWS Secrets Manager — see warehouse-gitops/apps/secrets/*.yaml.
-#
-# jwt-secret/flask-secret used to be generated here via random_password, but
-# that regenerates a new value on every apply — after a destroy+apply the
-# k8s Secret ESO creates would go out of sync with anything already relying
-# on the old value. They're now stored in AWS Secrets Manager
-# ("warehouse/app-secrets") like the mysql/grafana secrets, and must be
-# created there manually before the first apply:
-#
-#   aws secretsmanager create-secret \
-#     --name "warehouse/app-secrets" \
-#     --region eu-west-1 \
-#     --secret-string '{
-#       "jwt-secret": "CHOOSE_STRONG_SECRET_HERE",
-#       "flask-secret": "CHOOSE_STRONG_SECRET_HERE",
-#       "database-url": "mysql+pymysql://warehouse_user:warehouse_password@mysql/warehouse_db"
-#     }'
-#
-# The data source below isn't consumed by any resource (ESO reads the
-# secret directly, per warehouse-gitops/apps/secrets/app-external-secret.yaml)
-# — it exists so `terraform plan`/`apply` fails fast if the secret hasn't
-# been created yet, instead of that surfacing later as an ESO sync failure.
 data "aws_secretsmanager_secret_version" "app_secrets" {
   secret_id = "warehouse/app-secrets"
+}
+
+resource "null_resource" "cleanup_external_secrets_crds" {
+  triggers = {
+    always = timestamp()
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      kubectl delete externalsecret --all --all-namespaces --ignore-not-found=true 2>/dev/null || true
+      kubectl delete clustersecretstore --all --ignore-not-found=true 2>/dev/null || true
+      kubectl delete secretstore --all --all-namespaces --ignore-not-found=true 2>/dev/null || true
+    EOT
+  }
 }
 
 resource "helm_release" "external_secrets" {
@@ -89,6 +84,7 @@ resource "helm_release" "external_secrets" {
   namespace        = "external-secrets"
   create_namespace = true
   timeout          = 600
+
   set {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = var.external_secrets_role_arn
@@ -105,6 +101,7 @@ resource "helm_release" "metrics_server" {
   create_namespace = false
   depends_on       = [helm_release.argocd]
 }
+
 resource "helm_release" "nginx_ingress" {
   name             = "nginx-ingress"
   repository       = "https://kubernetes.github.io/ingress-nginx"
