@@ -34,3 +34,12 @@ resource "aws_s3_bucket_policy" "warehouse_images" {
 
   depends_on = [aws_s3_bucket_public_access_block.warehouse_images]
 }
+resource "aws_s3_bucket_server_side_encryption_configuration" "images" {
+  bucket = aws_s3_bucket.warehouse_images.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
