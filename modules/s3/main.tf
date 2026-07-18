@@ -1,5 +1,3 @@
-data "aws_caller_identity" "current" {}
-
 resource "aws_s3_bucket" "warehouse_images" {
   bucket        = var.bucket_name
   force_destroy = true
@@ -39,51 +37,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "images" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm     = "aws:kms"
-      kms_master_key_id = aws_kms_key.s3_images.arn
+      sse_algorithm = "AES256"
     }
-    bucket_key_enabled = true
   }
-}
-
-resource "aws_kms_key" "s3_images" {
-  description             = "KMS key for S3 images bucket encryption"
-  deletion_window_in_days = 7
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "Enable IAM Root Permissions"
-        Effect = "Allow"
-        Principal = {
-          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
-        }
-        Action   = "kms:*"
-        Resource = "*"
-      },
-      {
-        Sid    = "Allow Backend IRSA"
-        Effect = "Allow"
-        Principal = {
-          AWS = var.backend_role_arn
-        }
-        Action = [
-          "kms:GenerateDataKey",
-          "kms:Decrypt"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-
-  tags = {
-    Environment = var.environment
-    Terraform   = "true"
-  }
-}
-
-resource "aws_kms_alias" "s3_images" {
-  name          = "alias/warehouse-s3-images-${var.environment}"
-  target_key_id = aws_kms_key.s3_images.key_id
 }

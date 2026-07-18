@@ -23,9 +23,8 @@ module "eks" {
 }
 
 module "s3" {
-  source           = "./modules/s3"
-  environment      = var.environment
-  backend_role_arn = module.eks.backend_s3_role_arn
+  source      = "./modules/s3"
+  environment = var.environment
 }
 
 module "iam" {
