@@ -22,3 +22,8 @@ output "external_secrets_role_arn" {
   description = "IRSA role ARN for the External Secrets Operator service account"
   value       = module.external_secrets_irsa.iam_role_arn
 }
+
+output "backend_s3_role_arn" {
+  description = "IAM role ARN for backend S3 IRSA"
+  value       = module.backend_s3_irsa.iam_role_arn
+}

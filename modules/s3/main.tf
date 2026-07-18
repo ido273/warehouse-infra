@@ -66,7 +66,7 @@ resource "aws_kms_key" "s3_images" {
         Sid    = "Allow Backend IRSA"
         Effect = "Allow"
         Principal = {
-          AWS = module.backend_s3_irsa.iam_role_arn
+          AWS = var.backend_role_arn
         }
         Action = [
           "kms:GenerateDataKey",
