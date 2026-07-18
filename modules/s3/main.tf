@@ -39,7 +39,24 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "images" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.s3_images.arn
     }
+    bucket_key_enabled = true  
   }
+}
+
+resource "aws_kms_key" "s3_images" {
+  description             = "KMS key for S3 images bucket encryption"
+  deletion_window_in_days = 7
+
+  tags = {
+    Environment = var.environment
+    Terraform   = "true"
+  }
+}
+
+resource "aws_kms_alias" "s3_images" {
+  name          = "alias/warehouse-s3-images-${var.environment}"
+  target_key_id = aws_kms_key.s3_images.key_id
 }
