@@ -72,7 +72,7 @@ resource "aws_iam_role_policy" "terraform_minimal" {
     "Version": "2012-10-17",
     "Statement": [
       {
-        "Sid": "TerraformIAM",
+        "Sid": "TerraformIAMRoles",
         "Effect": "Allow",
         "Action": [
           "iam:CreateRole",
@@ -88,7 +88,14 @@ resource "aws_iam_role_policy" "terraform_minimal" {
           "iam:ListAttachedRolePolicies",
           "iam:ListInstanceProfilesForRole",
           "iam:TagRole",
-          "iam:UntagRole",
+          "iam:UntagRole"
+        ],
+        "Resource": "arn:aws:iam::*:role/warehouse-*"
+      },
+      {
+        "Sid": "TerraformIAM",
+        "Effect": "Allow",
+        "Action": [
           "iam:CreateOpenIDConnectProvider",
           "iam:DeleteOpenIDConnectProvider",
           "iam:GetOpenIDConnectProvider",
