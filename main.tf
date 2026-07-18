@@ -26,6 +26,10 @@ module "s3" {
   source      = "./modules/s3"
   environment = var.environment
 }
+
+module "iam" {
+  source = "./modules/iam"
+}
 data "kubernetes_service" "nginx_ingress" {
   metadata {
     name      = "nginx-ingress-ingress-nginx-controller"
