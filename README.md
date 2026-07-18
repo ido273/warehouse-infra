@@ -70,6 +70,7 @@ Root `main.tf` wires these in order: `vpc` → `ecr` → `eks` → `s3` → (rea
 | `modules/s3` | The `warehouse-images` bucket (public-read bucket policy for images, `force_destroy = true`) |
 | `modules/dns` | **Data-source lookups** (not resources) of the Route53 zone + ACM cert created in `core/`, plus the stack-specific A-record aliasing the domain to the ingress NLB |
 | `modules/argocd` | ArgoCD itself, the App-of-Apps root Application (watches `warehouse-gitops/apps` with `recurse: true`), the `warehouse` namespace, External Secrets Operator, and the other Helm releases below |
+| `modules/iam` | GitHub OIDC provider + the `warehouse-github-actions-oidc` IAM role that `warehouse-app`'s CI/CD assumes (see IAM permissions section below) |
 
 ### Helm releases installed by `modules/argocd`
 
@@ -155,4 +156,16 @@ Root (`terraform output`, after step 2 above):
 
 ## IAM permissions
 
-The `warehouse-ci-cd` IAM group uses least-privilege scoped policies instead of `*FullAccess`: AWS-managed policies plus two custom inline policies (`warehouse-terraform-minimal`, `warehouse-s3-ssm-minimal`) covering exactly the IAM/EC2/KMS/Logs/EKS/ECR actions Terraform needs. Policies attach to the group, not the user, so the CI user inherits everything via group membership.
+The `warehouse-ci-cd` IAM group uses least-privilege scoped policies instead of `*FullAccess`: AWS-managed policies plus two custom inline policies (`warehouse-terraform-minimal`, `warehouse-s3-ssm-minimal`) covering exactly the IAM/EC2/KMS/Logs/EKS/ECR actions Terraform needs. Policies attach to the group, not the user, so the CI user inherits everything via group membership. This group/user (`warehouse-github-actions`) still exists with static long-lived access keys — it's what's used to `terraform apply` this repo (including from a human's or CI's local AWS CLI session).
+
+### GitHub Actions CI/CD: OIDC, not static keys
+
+`warehouse-app`'s `cd.yaml`/`build-service.yml` workflows no longer use static `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` secrets to push images to ECR. Instead, `modules/iam/github_oidc.tf` provisions:
+
+- An `aws_iam_openid_connect_provider` for `token.actions.githubusercontent.com` (thumbprint fetched dynamically via a `tls_certificate` data source, not hardcoded).
+- The `warehouse-github-actions-oidc` IAM role, whose trust policy only allows `sts:AssumeRoleWithWebIdentity` for GitHub Actions runs from `ido273/warehouse-app` on branch `master` (`token.actions.githubusercontent.com:sub` = `repo:ido273/warehouse-app:ref:refs/heads/master`).
+- The same permission set as the `warehouse-github-actions` user: `AmazonEC2ContainerRegistryPowerUser` (AWS-managed), the `warehouse-terraform-minimal` and `warehouse-s3-ssm-minimal` inline policies (copied verbatim for parity), and the `warehouse-s3-images` customer-managed policy (attached by reference via `data "aws_iam_policy"`, not copied, so it can't drift from the real policy object).
+
+The role's ARN is exposed via the `github_oidc_role_arn` output — set this as the `AWS_OIDC_ROLE_ARN` secret in `warehouse-app`.
+
+**Known gap:** the inline policies above are exact copies of the existing `warehouse-terraform-minimal`/`warehouse-s3-ssm-minimal` documents, kept as-is for permission parity with the legacy user. One of the copied statements (`TerraformIAM`) allows `iam:PassRole`, `iam:CreateRole`, and `iam:PutRolePolicy` on `Resource: "*"` — broader than this OIDC role (which only builds/pushes images) actually needs. Scoping that down is a manual follow-up, not done here to avoid silently changing behavior shared with the legacy user's policy.
